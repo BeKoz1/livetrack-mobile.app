@@ -132,18 +132,14 @@
       badge.className = `text-xs border px-3 py-1 rounded-full mb-6 uppercase tracking-wider ${classes}`;
     }
 
-    // Zarządzanie sesją trackingu
+    // Zarządzanie sesją trackingu - Bezpieczna wersja wymuszająca zapytanie o GPS
     async function startTracking() {
       isTracking = true;
       pointCount = 0;
       document.getElementById("count-val").innerText = "0";
       
-      updateStatus("Inicjalizacja...", "border-yellow-600 text-yellow-500");
+      updateStatus("Inicjalizacja GPS...", "border-yellow-600 text-yellow-500");
       
-      if (!dbPush) await initFirebase();
-      await dbRemove(); // Czyszczenie poprzedniego biegu
-      await requestWakeLock();
-
       if (!navigator.geolocation) {
         updateStatus("Brak GPS w tel!", "border-red-900 text-red-500");
         return;
@@ -153,12 +149,26 @@
       const geoOptions = {
         enableHighAccuracy: true, 
         timeout: 10000,           
-        maximumAge: 0             
+        maximumAge: 0              
       };
 
+      // KROK 1: Od razu uruchamiamy nasłuchiwanie GPS, aby telefon wyświetlił okno uprawnień
       watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, geoOptions);
       
-      updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
+      // KROK 2: Bezpieczne próby połączenia z Firebase w bloku try-catch
+      try {
+        updateStatus("Łączenie z bazą...", "border-yellow-600 text-yellow-500");
+        if (!dbPush) await initFirebase();
+        await dbRemove(); // Czyszczenie poprzedniego biegu
+        await requestWakeLock();
+        
+        // Jeśli skrypty się pobrały i baza odpowiedziała:
+        updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
+      } catch (firebaseError) {
+        console.error("Błąd Firebase:", firebaseError);
+        updateStatus("Błąd bazy danych!", "border-red-900 text-red-500");
+      }
+
       const btn = document.getElementById("action-btn");
       btn.innerText = "Zatrzymaj nadawanie";
       btn.className = "w-full font-chakra font-bold py-4 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-wider text-sm uppercase";
