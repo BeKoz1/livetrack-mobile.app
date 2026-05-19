@@ -1,2 +1,183 @@
-# livetrack-mobile.app
-bieganie jako gra czyli sportto zabawa
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiveTrack - Nadajnik Mobilny</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Space+Mono&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Space Mono', monospace; background-color: #050505; color: #e0e0e0; }
+    .font-chakra { font-family: 'Chakra Petch', sans-serif; }
+    .glow-green { text-shadow: 0 0 8px #00ff00; }
+    .pulse-bg { animation: pulseGlow 2s infinite; }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 5px #00ff0033; }
+      50% { box-shadow: 0 0 20px #00ff0088; }
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between min-h-screen p-6">
+
+  <header class="text-center pt-4">
+    <h1 class="font-chakra font-bold text-xl tracking-widest text-white">
+      LIVETRACK <span class="text-[#00ff00] glow-green">TRANSMITTER</span>
+    </h1>
+    <p class="text-xs text-gray-600 mt-1">MOBILE GPS STREAMER</p>
+  </header>
+
+  <main class="flex-1 flex flex-col justify-center items-center my-8 w-full max-w-sm mx-auto bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-6">
+    
+    <div id="status-badge" class="text-xs border border-gray-800 text-gray-500 px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
+      Gotowy do startu
+    </div>
+
+    <div class="w-full space-y-4 mb-8">
+      <div class="flex justify-between border-b border-[#111] pb-2">
+        <span class="text-gray-600 text-xs uppercase">Szerokość (Lat)</span>
+        <span id="lat-val" class="font-chakra text-white text-lg font-semibold">--.------</span>
+      </div>
+      <div class="flex justify-between border-b border-[#111] pb-2">
+        <span class="text-gray-600 text-xs uppercase">Długość (Lng)</span>
+        <span id="lng-val" class="font-chakra text-white text-lg font-semibold">--.------</span>
+      </div>
+      <div class="flex justify-between border-b border-[#111] pb-2">
+        <span class="text-gray-600 text-xs uppercase">Dokładność</span>
+        <span id="acc-val" class="font-chakra text-[#00ff00] text-lg font-semibold">-- <span class="text-xs text-gray-600">m</span></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-600 text-xs uppercase">Wysłane punkty</span>
+        <span id="count-val" class="font-chakra text-white text-lg font-semibold">0</span>
+      </div>
+    </div>
+
+    <button id="action-btn" class="w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase">
+      Uruchom nadawanie
+    </button>
+
+  </main>
+
+  <footer class="text-center text-[10px] text-gray-700 pb-2">
+    Firebase Realtime DB Connector v1.0
+  </footer>
+
+  <script type="module">
+    // CONFIG: Podmień na swój URL z Firebase (ten sam co w aplikacji Claude'a)
+    const FIREBASE_DB_URL = "[https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com](https://console.firebase.google.com/u/0/project/biegacz/database/biegacz-default-rtdb/data/~2F)";
+
+    let dbPush = null;
+    let dbRemove = null;
+    let watchId = null;
+    let wakeLock = null;
+    let pointCount = 0;
+    let isTracking = false;
+
+    // Dynamiczny import SDK Firebase przez CDN
+    async function initFirebase() {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+      const { getDatabase, ref, push, remove } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+      
+      const app = initializeApp({ databaseURL: FIREBASE_DB_URL });
+      const db = getDatabase(app);
+      
+      // Przypisanie funkcji do zmiennych globalnych modułu
+      dbPush = (coord) => push(ref(db, "run/coords"), coord);
+      dbRemove = () => remove(ref(db, "run"));
+    }
+
+    // Blokada wygaszania ekranu (Ważne podczas biegu!)
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.warn("Wake Lock błąd:", err.message);
+        }
+      }
+    }
+
+    // Obsługa pozycji GPS
+    function handleSuccess(position) {
+      const { latitude, longitude, accuracy } = position.coords;
+      
+      // Aktualizacja UI
+      document.getElementById("lat-val").innerText = latitude.toFixed(6);
+      document.getElementById("lng-val").innerText = longitude.toFixed(6);
+      document.getElementById("acc-val").innerText = Math.round(accuracy);
+
+      // Wysyłanie do Firebase tylko, jeśli dokładność jest akceptowalna (< 30 metrów)
+      if (accuracy < 30) {
+        const coord = {
+          lat: latitude,
+          lng: longitude,
+          ts: Date.now()
+        };
+        
+        if (dbPush) {
+          dbPush(coord);
+          pointCount++;
+          document.getElementById("count-val").innerText = pointCount;
+        }
+      }
+    }
+
+    function handleError(error) {
+      console.error("GPS Error:", error);
+      updateStatus("Błąd GPS: " + error.message, "border-red-900 text-red-500");
+    }
+
+    function updateStatus(text, classes) {
+      const badge = document.getElementById("status-badge");
+      badge.innerText = text;
+      badge.className = `text-xs border px-3 py-1 rounded-full mb-6 uppercase tracking-wider ${classes}`;
+    }
+
+    // Zarządzanie sesją trackingu
+    async function startTracking() {
+      isTracking = true;
+      pointCount = 0;
+      document.getElementById("count-val").innerText = "0";
+      
+      updateStatus("Inicjalizacja...", "border-yellow-600 text-yellow-500");
+      
+      if (!dbPush) await initFirebase();
+      await dbRemove(); // Czyszczenie poprzedniego biegu
+      await requestWakeLock();
+
+      if (!navigator.geolocation) {
+        updateStatus("Brak GPS w tel!", "border-red-900 text-red-500");
+        return;
+      }
+
+      // Opcje GPS gwarantujące wysoką dokładność i ciągłe odświeżanie
+      const geoOptions = {
+        enableHighAccuracy: true, 
+        timeout: 10000,           
+        maximumAge: 0             
+      };
+
+      watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, geoOptions);
+      
+      updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
+      const btn = document.getElementById("action-btn");
+      btn.innerText = "Zatrzymaj nadawanie";
+      btn.className = "w-full font-chakra font-bold py-4 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-wider text-sm uppercase";
+    }
+
+    function stopTracking() {
+      isTracking = false;
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (wakeLock) wakeLock.release().then(() => wakeLock = null);
+      
+      updateStatus("Transmisja zakończona", "border-gray-800 text-gray-500");
+      const btn = document.getElementById("action-btn");
+      btn.innerText = "Uruchom nadawanie";
+      btn.className = "w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase";
+    }
+
+    document.getElementById("action-btn").addEventListener("click", () => {
+      if (isTracking) stopTracking(); else startTracking();
+    });
+  </script>
+</body>
+</html>
