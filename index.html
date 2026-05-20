@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LiveTrack - Nadajnik Mobilny</title>
+  <title>LiveTrack - Nadajnik i Sędzia Mobilny</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Space+Mono&display=swap" rel="stylesheet">
   
@@ -25,90 +25,221 @@
 
   <header class="text-center pt-4">
     <h1 class="font-chakra font-bold text-xl tracking-widest text-white">
-      LIVETRACK <span class="text-[#00ff00] glow-green">TRANSMITTER</span>
+      LIVETRACK <span class="text-[#00ff00] glow-green">REFEREE</span>
     </h1>
-    <p class="text-xs text-gray-600 mt-1">MOBILE GPS STREAMER</p>
+    <p class="text-xs text-gray-600 mt-1">MOBILE GAME ENGINE</p>
   </header>
 
-  <main class="flex-1 flex flex-col justify-center items-center my-8 w-full max-w-sm mx-auto bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-6">
+  <main id="lobby-screen" class="flex-1 flex flex-col justify-center items-center my-8 w-full max-w-sm mx-auto bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-6 space-y-6">
+    <h2 class="font-chakra text-sm uppercase tracking-wider text-gray-400">Wybierz swoją tożsamość</h2>
     
+    <div class="w-full space-y-3">
+      <button onclick="selectPlayer('player1')" class="w-full py-3 border border-[#00ffff] text-[#00ffff] font-chakra uppercase text-xs tracking-wider rounded bg-cyan-950/20 hover:bg-cyan-950/50 transition-all">
+        Jestem Graczem 1 (Cyan)
+      </button>
+      <button onclick="selectPlayer('player2')" class="w-full py-3 border border-[#ff00ff] text-[#ff00ff] font-chakra uppercase text-xs tracking-wider rounded bg-magenta-950/20 hover:bg-magenta-950/50 transition-all">
+        Jestem Graczem 2 (Magenta)
+      </button>
+    </div>
+
+    <div id="mode-selector-zone" class="w-full border-t border-[#111] pt-4 hidden">
+      <h3 class="font-chakra text-xs uppercase tracking-wider text-center text-gray-500 mb-3">Wybierz tryb pojedynku</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="setGameMode('score_duel')" class="py-2 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase">🍺 Pojedynek Piwny</button>
+        <button onclick="setGameMode('tron_race')" class="py-2 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase">🎮 Wyścig TRON</button>
+      </div>
+    </div>
+  </main>
+
+  <main id="game-screen" class="flex-1 flex flex-col justify-center items-center my-8 w-full max-w-sm mx-auto bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-6 hidden">
     <div id="status-badge" class="text-xs border border-gray-800 text-gray-500 px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
-      Gotowy do startu
+      Oczekiwanie...
     </div>
 
-    <div class="w-full space-y-4 mb-8">
-      <div class="flex justify-between border-b border-[#111] pb-2">
-        <span class="text-gray-600 text-xs uppercase">Szerokość (Lat)</span>
-        <span id="lat-val" class="font-chakra text-white text-lg font-semibold">--.------</span>
+    <div class="w-full space-y-3 mb-6 text-sm">
+      <div class="flex justify-between border-b border-[#111] pb-1">
+        <span class="text-gray-600 text-xs uppercase">Rola</span>
+        <span id="ui-role" class="font-chakra font-bold text-white">--</span>
       </div>
-      <div class="flex justify-between border-b border-[#111] pb-2">
-        <span class="text-gray-600 text-xs uppercase">Długość (Lng)</span>
-        <span id="lng-val" class="font-chakra text-white text-lg font-semibold">--.------</span>
+      <div class="flex justify-between border-b border-[#111] pb-1">
+        <span class="text-gray-600 text-xs uppercase">Tryb gry</span>
+        <span id="ui-mode" class="font-chakra text-yellow-500">--</span>
       </div>
-      <div class="flex justify-between border-b border-[#111] pb-2">
-        <span class="text-gray-600 text-xs uppercase">Dokładność</span>
-        <span id="acc-val" class="font-chakra text-[#00ff00] text-lg font-semibold">-- <span class="text-xs text-gray-600">m</span></span>
+      <div class="flex justify-between border-b border-[#111] pb-1">
+        <span class="text-gray-600 text-xs uppercase">Twój Wynik / Punkty</span>
+        <span id="ui-score" class="font-chakra text-[#00ff00] text-lg font-bold">0.00</span>
       </div>
-      <div class="flex justify-between">
-        <span class="text-gray-600 text-xs uppercase">Wysłane punkty</span>
-        <span id="count-val" class="font-chakra text-white text-lg font-semibold">0</span>
+      <div class="flex justify-between border-b border-[#111] pb-1">
+        <span class="text-gray-600 text-xs uppercase">Dokładność GPS</span>
+        <span id="ui-acc" class="font-chakra text-white">--</span>
       </div>
     </div>
 
-    <button id="action-btn" class="w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase">
+    <button id="action-btn" onclick="toggleTracking()" class="w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase">
       Uruchom nadawanie
     </button>
-
   </main>
 
   <footer class="text-center text-[10px] text-gray-700 pb-2">
-    Firebase Realtime DB Connector v1.2
+    Firebase Mobile Referee Engine v2.0
   </footer>
 
   <script>
     const FIREBASE_DB_URL = "https://biegacz-default-rtdb.europe-west1.firebasedatabase.app/";
-
-    let dbRef = null;
+    
+    let myId = null;
+    let opponentId = null;
+    let activeMode = "score_duel";
+    let isTracking = false;
     let watchId = null;
     let wakeLock = null;
-    let pointCount = 0;
-    let isTracking = false;
 
-    function initFirebase() {
-      if (!window.firebase) return false;
-      if (firebase.apps.length === 0) {
-        firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
-      }
-      dbRef = firebase.database().ref("run/coords");
-      return true;
+    // Logika naliczania statystyk
+    let lastCoord = null;
+    let totalDistanceKm = 0;
+    let startTime = null;
+    let opponentCoords = [];
+
+    firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+    const db = firebase.database();
+
+    // Czysty JSowy wzór Haversine do obliczania odległości (metry lub km)
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    async function requestWakeLock() {
-      if ('wakeLock' in navigator) {
-        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-      }
-    }
-
-    function handleSuccess(position) {
-      const { latitude, longitude, accuracy } = position.coords;
+    function selectPlayer(id) {
+      myId = id;
+      opponentId = id === 'player1' ? 'player2' : 'player1';
+      document.getElementById("ui-role").innerText = id === 'player1' ? "GRACZ 1 (Cyan)" : "GRACZ 2 (Magenta)";
       
-      document.getElementById("lat-val").innerText = latitude.toFixed(6);
-      document.getElementById("lng-val").innerText = longitude.toFixed(6);
-      document.getElementById("acc-val").innerText = Math.round(accuracy);
+      document.getElementById("lobby-screen").classList.add("hidden");
+      document.getElementById("game-screen").classList.remove("hidden");
 
-      // Wysyłanie punktów do bazy danych
-      if (accuracy < 40) {
-        const coord = { lat: latitude, lng: longitude, ts: Date.now() };
-        if (dbRef) {
-          dbRef.push(coord);
-          pointCount++;
-          document.getElementById("count-val").innerText = pointCount;
+      // Nasłuchuj zmian trybu gry i statusu z bazy danych
+      db.ref("active_game").on("value", (snapshot) => {
+        const game = snapshot.val() || {};
+        activeMode = game.mode || "score_duel";
+        document.getElementById("ui-mode").innerText = activeMode === "score_duel" ? "🍺 Pojedynek Piwny" : "🎮 Wyścig TRON";
+        
+        if (game.status === "finished") {
+          stopTracking();
+          updateStatus("KONIEC GRY! WYGRAŁ: " + game.winner, "border-red-500 text-red-500");
         }
+      });
+
+      // Jeśli gramy w TRON, pobieraj współrzędne przeciwnika, aby sprawdzać kolizje
+      db.ref(`live/${opponentId}`).on("value", (snapshot) => {
+        opponentCoords = [];
+        snapshot.forEach((child) => {
+          const val = child.val();
+          if(val.lat && val.lng) opponentCoords.push(val);
+        });
+      });
+    }
+
+    function setGameMode(mode) {
+      db.ref("active_game").update({ mode: mode, status: "lobby", winner: null });
+    }
+
+    async function toggleTracking() {
+      if (isTracking) {
+        stopTracking();
+      } else {
+        startTracking();
       }
     }
 
-    function handleError(error) {
-      updateStatus("Błąd GPS: " + error.message, "border-red-900 text-red-500");
+    function startTracking() {
+      isTracking = true;
+      totalDistanceKm = 0;
+      lastCoord = null;
+      startTime = Date.now();
+      
+      document.getElementById("action-btn").innerText = "Zatrzymaj grę";
+      document.getElementById("action-btn").className = "w-full font-chakra font-bold py-4 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-wider text-sm uppercase";
+      updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
+
+      if (myId === "player1") {
+        db.ref("live").remove(); // Gracz 1 resetuje mapę na start nowej gry
+        db.ref("active_game").update({ status: "live", winner: null });
+      }
+
+      if ('navigator' in window && 'wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(lock => wakeLock = lock).catch(()=>{});
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          document.getElementById("ui-acc").innerText = Math.round(accuracy) + " m";
+
+          if (accuracy > 40) return; // Filtr słabego sygnału
+
+          const now = Date.now();
+          let currentScore = 0;
+
+          // Obliczanie dystansu i punktacji w Pojedynku Piwnym
+          if (lastCoord) {
+            const d = haversineMeters(lastCoord.lat, lastCoord.lng, latitude, longitude) / 1000; // w km
+            totalDistanceKm += d;
+          }
+          lastCoord = { lat: latitude, lng: longitude };
+
+          const elapsedMinutes = (now - startTime) / 1000 / 60;
+          const avgSpeedKmh = elapsedMinutes > 0 ? (totalDistanceKm / (elapsedMinutes / 60)) : 0;
+
+          if (activeMode === "score_duel") {
+            currentScore = (totalDistanceKm * 50) + (avgSpeedKmh * 20) + (elapsedMinutes * 2);
+            document.getElementById("ui-score").innerText = currentScore.toFixed(2);
+          }
+
+          // WYSYŁANIE DO BAZY
+          const nodeRef = db.ref(`live/${myId}`).push();
+          nodeRef.set({ lat: latitude, lng: longitude, ts: now, score: currentScore });
+
+          // SILNIK SĘDZIOWSKI (REFEREE ENGINE)
+          if (activeMode === "tron_race") {
+            // 1. Sprawdzenie Mety (Checkpointu)
+            db.ref("active_game/checkpoint").once("value", (snap) => {
+              const cp = snap.val();
+              if (cp) {
+                const distToMeta = haversineMeters(latitude, longitude, cp.lat, cp.lng);
+                if (distToMeta < 15) { // 15 metrów do wygranej
+                  db.ref("active_game").update({ status: "finished", winner: myId });
+                }
+              }
+            });
+
+            // 2. Sprawdzenie kolizji ze ścianą przeciwnika
+            for (let i = 0; i < opponentCoords.length; i++) {
+              const distToWall = haversineMeters(latitude, longitude, opponentCoords[i].lat, opponentCoords[i].lng);
+              if (distToWall < 7) { // 7 metrów do skasowania
+                db.ref("active_game").update({ status: "finished", winner: opponentId });
+                break;
+              }
+            }
+          }
+        },
+        (err) => { updateStatus("Błąd GPS: " + err.message, "border-red-900 text-red-500"); },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function stopTracking() {
+      isTracking = false;
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (wakeLock) { wakeLock.release().then(() => wakeLock = null); }
+      
+      document.getElementById("action-btn").innerText = "Uruchom nadawanie";
+      document.getElementById("action-btn").className = "w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase";
+      updateStatus("Rozłączony", "border-gray-800 text-gray-500");
     }
 
     function updateStatus(text, classes) {
@@ -116,53 +247,6 @@
       badge.innerText = text;
       badge.className = `text-xs border px-3 py-1 rounded-full mb-6 uppercase tracking-wider ${classes}`;
     }
-
-    function startTracking() {
-      isTracking = true;
-      pointCount = 0;
-      document.getElementById("count-val").innerText = "0";
-      
-      updateStatus("Uruchamianie...", "border-yellow-600 text-yellow-500");
-      
-      if (!navigator.geolocation) {
-        updateStatus("Brak GPS!", "border-red-900 text-red-500");
-        return;
-      }
-
-      // 1. Inicjalizacja Firebase i czyszczenie (bez blokowania UI)
-      initFirebase();
-      try {
-        firebase.database().ref("run").remove();
-      } catch(e) { console.error(e); }
-
-      // 2. Odpalenie blokady ekranu i GPS
-      requestWakeLock();
-      const geoOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
-      watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, geoOptions);
-      
-      // 3. Natychmiastowy start wizualny transmisji
-      updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
-      
-      const btn = document.getElementById("action-btn");
-      btn.innerText = "Zatrzymaj nadawanie";
-      btn.className = "w-full font-chakra font-bold py-4 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-wider text-sm uppercase";
-    }
-
-    function stopTracking() {
-      isTracking = false;
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      if (wakeLock) { wakeLock.release().then(() => wakeLock = null); }
-      dbRef = null;
-      
-      updateStatus("Transmisja zakończona", "border-gray-800 text-gray-500");
-      const btn = document.getElementById("action-btn");
-      btn.innerText = "Uruchom nadawanie";
-      btn.className = "w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-sm uppercase";
-    }
-
-    document.getElementById("action-btn").addEventListener("click", () => {
-      if (isTracking) stopTracking(); else startTracking();
-    });
   </script>
 </body>
 </html>
