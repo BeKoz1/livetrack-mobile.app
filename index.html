@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LiveTrack - Mobilny HUD i Sędzia</title>
+  <title>LiveTrack - Mobilny HUD i Sędzia (Fix Flow)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Space+Mono&display=swap" rel="stylesheet">
   
@@ -22,8 +22,9 @@
       0%, 100% { box-shadow: 0 0 5px #00ff0033; }
       50% { box-shadow: 0 0 20px #00ff0088; }
     }
+    /* Stylizacja kontenerów mapy */
     #mini-map { width: 100%; height: 200px; border-radius: 6px; border: 1px solid #222; }
-    #live-map { width: 100%; height: 280px; border-radius: 6px; border: 1px solid #222; }
+    #live-map { width: 100%; height: 280px; border-radius: 6px; border: 1px solid #333; background: #000; }
   </style>
 </head>
 <body class="flex flex-col justify-between min-h-screen p-4">
@@ -32,18 +33,22 @@
     <h1 class="font-chakra font-bold text-lg tracking-widest text-white">
       LIVETRACK <span class="text-[#00ff00] glow-green">HUD</span>
     </h1>
+    <p class="text-[9px] text-gray-700 mt-1">MOBILE GAME ENGINE + MAP</p>
   </header>
 
   <main id="lobby-screen" class="flex-1 flex flex-col justify-center items-center my-4 w-full max-w-sm mx-auto bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-5 space-y-4">
-    <h2 class="font-chakra text-xs uppercase tracking-wider text-gray-400">Wybierz swoją tożsamość</h2>
+    <h2 class="font-chakra text-xs uppercase tracking-wider text-gray-400">Konfiguracja Pojedynku</h2>
     
-    <div class="w-full grid grid-cols-2 gap-2">
-      <button onclick="selectPlayer('player1')" class="py-3 border border-[#00ffff] text-[#00ffff] font-chakra uppercase text-[10px] tracking-wider rounded bg-cyan-950/20 active:bg-cyan-950/60 transition-all">
-        Gracz 1 (Cyan)
-      </button>
-      <button onclick="selectPlayer('player2')" class="py-3 border border-[#ff00ff] text-[#ff00ff] font-chakra uppercase text-[10px] tracking-wider rounded bg-magenta-950/20 active:bg-magenta-950/60 transition-all">
-        Gracz 2 (Magenta)
-      </button>
+    <div class="w-full space-y-2">
+      <p class="text-[10px] text-gray-600 text-center uppercase">Wybierz swoją rolę:</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-p1" onclick="selectPlayer('player1')" class="py-3 border border-zinc-700 text-gray-500 font-chakra uppercase text-[10px] tracking-wider rounded transition-all">
+          Jestem Graczem 1
+        </button>
+        <button id="btn-p2" onclick="selectPlayer('player2')" class="py-3 border border-zinc-700 text-gray-500 font-chakra uppercase text-[10px] tracking-wider rounded transition-all">
+          Jestem Graczem 2
+        </button>
+      </div>
     </div>
 
     <div id="p1-setup-zone" class="w-full border-t border-[#111] pt-3 hidden space-y-3">
@@ -51,7 +56,7 @@
       
       <div class="grid grid-cols-2 gap-2">
         <button onclick="setGameMode('score_duel')" id="btn-mode-score" class="py-2 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase">🍺 Pojedynek</button>
-        <button onclick="setGameMode('tron_race')" id="btn-mode-tron" class="py-2 text-[10px] bg-zinc-800 border border-yellow-500 text-yellow-500 rounded font-chakra uppercase">🎮 TRON</button>
+        <button onclick="setGameMode('tron_race')" id="btn-mode-tron" class="py-2 text-[10px] bg-zinc-800 border border-yellow-500 text-yellow-500 rounded font-chakra uppercase pulse-bg">🎮 TRON</button>
       </div>
 
       <div id="map-picker-container" class="space-y-2">
@@ -61,8 +66,8 @@
       </div>
     </div>
 
-    <button id="ready-launch-btn" onclick="goToGameScreen()" class="w-full py-3 bg-zinc-800 text-gray-400 font-chakra uppercase text-xs tracking-wider rounded hidden">
-      Wejdź do gry
+    <button id="ready-launch-btn" onclick="goToGameScreen()" class="w-full py-4 bg-zinc-800 text-gray-400 font-chakra uppercase font-bold text-xs tracking-wider rounded transition-all hidden">
+      Wejdź do gry taktycznej
     </button>
   </main>
 
@@ -72,7 +77,7 @@
       <div id="status-badge" class="text-[10px] border border-gray-800 text-gray-500 px-3 py-0.5 rounded-full uppercase tracking-wider">
         Oczekiwanie...
       </div>
-      <div id="ui-role" class="font-chakra font-bold text-xs">--</div>
+      <div id="ui-role-active" class="font-chakra font-bold text-xs">--</div>
     </div>
 
     <div id="live-map" class="mb-3"></div>
@@ -86,10 +91,6 @@
         <span class="text-gray-600 text-[10px] uppercase block">Twój Wynik</span>
         <span id="ui-score" class="font-chakra text-[#00ff00] font-bold">0.00</span>
       </div>
-      <div class="col-span-2 border-t border-[#111] pt-1 mt-1 flex justify-between">
-        <span class="text-gray-600 text-[10px] uppercase">Sygnał GPS:</span>
-        <span id="ui-acc" class="font-chakra text-white">--</span>
-      </div>
     </div>
 
     <button id="action-btn" onclick="toggleTracking()" class="w-full font-chakra font-bold py-3 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-wider text-xs uppercase">
@@ -98,7 +99,7 @@
   </main>
 
   <footer class="text-center text-[9px] text-gray-700">
-    Firebase Mobile HUD Engine v2.5
+    Firebase Mobile Referee + LiveHUD v2.6
   </footer>
 
   <script>
@@ -112,7 +113,6 @@
     let watchId = null;
     let wakeLock = null;
     
-    // Obiekty map Mapbox
     let miniMap = null;
     let liveMap = null;
     let clickMarker = null;
@@ -137,23 +137,37 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    // --- POPRAWKA 1: selectPlayer nie przełącza ekranów, tylko konfiguruje lobby --
     function selectPlayer(id) {
       myId = id;
       opponentId = id === 'player1' ? 'player2' : 'player1';
       
-      const roleText = id === 'player1' ? "G1 (Cyan)" : "G2 (Magenta)";
-      document.getElementById("ui-role").innerText = roleText;
-      document.getElementById("ui-role").className = id === 'player1' ? "font-chakra font-bold text-xs text-cyan-400" : "font-chakra font-bold text-xs text-magenta-400";
+      // Stylowanie przycisków
+      const btn1 = document.getElementById("btn-p1");
+      const btn2 = document.getElementById("btn-p2");
+      btn1.className = id === 'player1' ? "py-3 border border-[#00ffff] text-[#00ffff] font-chakra uppercase text-[10px] rounded bg-cyan-950/20" : "py-3 border border-zinc-700 text-gray-500 font-chakra uppercase text-[10px] rounded";
+      btn2.className = id === 'player2' ? "py-3 border border-[#ff00ff] text-[#ff00ff] font-chakra uppercase text-[10px] rounded bg-magenta-950/20" : "py-3 border border-zinc-700 text-gray-500 font-chakra uppercase text-[10px] rounded";
+
+      // Przygotuj tekst na ekranie startowym
+      const roleTextActive = id === 'player1' ? "Rola: G1 (Cyan)" : "Rola: G2 (Magenta)";
+      document.getElementById("ui-role-active").innerText = roleTextActive;
+      document.getElementById("ui-role-active").className = id === 'player1' ? "font-chakra font-bold text-xs text-cyan-400" : "font-chakra font-bold text-xs text-magenta-400";
       
-      document.getElementById("ready-launch-btn").classList.remove("hidden");
-      document.getElementById("ready-launch-btn").className = "w-full py-3 bg-[#00ff00] text-black font-chakra font-bold uppercase text-xs tracking-wider rounded transition-all";
+      // Pokaż przycisk wejścia do gry (był ukryty)
+      const startBtn = document.getElementById("ready-launch-btn");
+      startBtn.classList.remove("hidden");
+      startBtn.className = "w-full py-4 bg-[#00ff00] text-black font-chakra font-bold uppercase text-xs tracking-wider rounded transition-all pulse-bg";
+      startBtn.innerText = (myId === 'player1') ? "Zatwierdź metę i Wejdź do gry" : "Dołącz do gry";
 
       if (myId === "player1") {
         document.getElementById("p1-setup-zone").classList.remove("hidden");
         initMiniMap();
+      } else {
+        // Gracz 2 nie widzi setupu, ale musi kliknąć przycisk "Dołącz"
+        document.getElementById("p1-setup-zone").classList.add("hidden");
       }
 
-      // Synchronizacja stanu z Firebase
+      // Synchronizacja bazy danych na żywo (bez zmian)
       db.ref("active_game").on("value", (snapshot) => {
         const game = snapshot.val() || {};
         activeMode = game.mode || "tron_race";
@@ -168,8 +182,6 @@
           updateStatus("KONIEC! WYGRAŁ: " + (game.winner === "player1" ? "GRACZ 1" : "GRACZ 2"), "border-red-500 text-red-500");
         }
       });
-
-      // Synchronizacja śladu przeciwnika na mapie HUD telefonu
       db.ref(`live/${opponentId}`).on("value", (snapshot) => {
         opponentCoords = [];
         const mapCoords = [];
@@ -182,8 +194,6 @@
         });
         updateHUDLayer(opponentId, mapCoords);
       });
-
-      // Synchronizacja własnego śladu z bazy (na wypadek odświeżenia)
       db.ref(`live/${myId}`).on("value", (snapshot) => {
         const mapCoords = [];
         snapshot.forEach((child) => {
@@ -194,34 +204,29 @@
       });
     }
 
+    // Mini-mapa lobby (bez zmian)
     function initMiniMap() {
       mapboxgl.accessToken = MAPBOX_TOKEN;
       navigator.geolocation.getCurrentPosition((pos) => {
         buildMiniMap(pos.coords.longitude, pos.coords.latitude);
-      }, () => {
-        buildMiniMap(21.0122, 52.2297);
-      }, { enableHighAccuracy: true });
+      }, () => { buildMiniMap(21.0122, 52.2297); }, { enableHighAccuracy: true });
     }
-
     function buildMiniMap(lng, lat) {
-      miniMap = new mapboxgl.Map({
-        container: 'mini-map', style: 'mapbox://styles/mapbox/dark-v11',
-        center: [lng, lat], zoom: 14, attributionControl: false
-      });
+      miniMap = new mapboxgl.Map({ container: 'mini-map', style: 'mapbox://styles/mapbox/dark-v11', center: [lng, lat], zoom: 14, attributionControl: false });
       clickMarker = new mapboxgl.Marker({ color: "#FFFF00" }).setLngLat([lng, lat]).addTo(miniMap);
-      miniMap.on('click', (e) => {
-        clickMarker.setLngLat(e.lngLat);
-        document.getElementById("meta-status").innerText = `Meta zapisana!`;
-        db.ref("active_game/checkpoint").set({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-      });
+      miniMap.on('click', (e) => { clickMarker.setLngLat(e.lngLat); document.getElementById("meta-status").innerText = `Meta zapisana!`; db.ref("active_game/checkpoint").set({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
     }
 
-    // INICJALIZACJA LIVE MAPY HUD DLA OBU GRACZY
+    // --- POPRAWKA 2: initLiveMap TO JEDYNE MIEJSCE INICJALIZACJI MAPY ---
+    // Funkcja tworzy obiekt mapy taktycznej na telefonie
     function initLiveMap(startLng, startLat) {
       mapboxgl.accessToken = MAPBOX_TOKEN;
       liveMap = new mapboxgl.Map({
-        container: 'live-map', style: 'mapbox://styles/mapbox/dark-v11',
-        center: [startLng, startLat], zoom: 15, attributionControl: false
+        container: 'live-map', // To ten węzeł, który był pusty!
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [startLng, startLat],
+        zoom: 15,
+        attributionControl: false
       });
 
       liveMap.on('load', () => {
@@ -233,11 +238,9 @@
         liveMap.addLayer({ id: "line-p2", type: "line", source: "player2", paint: { "line-color": "#FF00FF", "line-width": 5 } });
 
         // Marker celu (Mety) na HUDzie
-        metaMarkerHUD = new mapboxgl.Marker({ color: "#FFFF00" })
-          .setLngLat([startLng, startLat])
-          .addTo(liveMap);
-
-        // Pobierz aktualny punkt z bazy
+        metaMarkerHUD = new mapboxgl.Marker({ color: "#FFFF00" }).setLngLat([startLng, startLat]).addTo(liveMap);
+        
+        // Pobierz cel z bazy, jeśli już tam jest
         db.ref("active_game/checkpoint").once("value", (snap) => {
           const cp = snap.val();
           if (cp) metaMarkerHUD.setLngLat([cp.lng, cp.lat]);
@@ -245,6 +248,7 @@
       });
     }
 
+    // Aktualizacja śladu na mapie telefonu lokalnie
     function updateHUDLayer(id, coords) {
       if (!liveMap || !liveMap.isStyleLoaded()) return;
       const src = liveMap.getSource(id);
@@ -257,12 +261,15 @@
       if(miniMap) miniMap.resize();
     }
 
+    // --- POPRAWKA 3: TO JEST JEDYNE MIEJSCE PRZEŁĄCZAJĄCE EKRANY ---
+    // Gracz 1 i Gracz 2 muszą to kliknąć w lobby
     function goToGameScreen() {
+      // 1. Zmiana wizualna ekranu na lobby
       document.getElementById("lobby-screen").classList.add("hidden");
       document.getElementById("game-screen").classList.remove("hidden");
       
-      // Odpal pustą mapę na środku Warszawy, zaraz przeskoczy na pozycję GPS
-      initLiveMap(21.0122, 52.2297);
+      // 2. ODPALENIE MAPY TAKTYCZNEJ (ZARAZ PRZESKOCZY NA GPS)
+      initLiveMap(21.0122, 52.2297); 
     }
 
     function toggleTracking() {
@@ -280,10 +287,4 @@
       document.getElementById("action-btn").className = "w-full font-chakra font-bold py-3 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-wider text-xs uppercase";
       updateStatus("Transmisja LIVE", "border-[#00ff00] text-[#00ff00] pulse-bg glow-green");
 
-      if (myId === "player1") {
-        db.ref("live").remove(); 
-        db.ref("active_game").update({ status: "live", winner: null });
-      }
-
-      if ('wakeLock' in navigator) {
-        navigator.wakeLock.request('
+      if (myId === "player
