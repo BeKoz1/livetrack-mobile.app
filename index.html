@@ -1,1 +1,435 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LiveTrack - Tactical HUD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Space+Mono&display=swap" rel="stylesheet">
+  
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" rel="stylesheet" />
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <style>
+    body { font-family: 'Space Mono', monospace; background-color: #050505; color: #e0e0e0; margin: 0; overflow: hidden; }
+    .font-chakra { font-family: 'Chakra Petch', sans-serif; }
+    .glow-green { text-shadow: 0 0 8px #00ff00; }
+    .glow-red { text-shadow: 0 0 8px #ff0000; }
+    .glow-cyan { text-shadow: 0 0 8px #00ffff; }
+    .glow-magenta { text-shadow: 0 0 8px #ff00ff; }
+    
+    /* Pełnoekranowa mapa w tle na ekranie gry */
+    #live-map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+    
+    /* Półprzezroczysty interfejs HUD nałożony na mapę */
+    .hud-overlay { position: absolute; z-index: 10; background: rgba(5, 5, 5, 0.85); backdrop-filter: blur(8px); border: 1px solid #222; }
+    
+    #mini-map { width: 100%; height: 200px; border-radius: 6px; border: 1px solid #333; }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+  <main id="lobby-screen" class="flex-1 flex flex-col justify-center items-center w-full max-w-sm mx-auto p-5 space-y-5 relative z-20">
+    <header class="text-center w-full mb-4">
+      <h1 class="font-chakra font-bold text-2xl tracking-widest text-white">
+        LIVE<span class="text-[#00ff00] glow-green">TRACK</span>
+      </h1>
+      <p class="text-[10px] text-gray-500 mt-1 uppercase tracking-widest">Tactical Mobile HUD</p>
+    </header>
+
+    <div class="w-full space-y-2">
+      <p class="text-[10px] text-gray-500 text-center uppercase tracking-widest">Wybierz tożsamość:</p>
+      <div class="grid grid-cols-2 gap-3">
+        <button id="btn-p1" onclick="selectPlayer('player1')" class="py-4 border border-zinc-700 text-gray-500 font-chakra uppercase text-xs tracking-wider rounded transition-all">
+          Gracz 1 (Cyan)
+        </button>
+        <button id="btn-p2" onclick="selectPlayer('player2')" class="py-4 border border-zinc-700 text-gray-500 font-chakra uppercase text-xs tracking-wider rounded transition-all">
+          Gracz 2 (Magenta)
+        </button>
+      </div>
+    </div>
+
+    <div id="p1-setup-zone" class="w-full border-t border-[#111] pt-4 hidden space-y-4">
+      <h3 class="font-chakra text-xs uppercase tracking-wider text-center text-yellow-500">Ustawienia gry</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="setGameMode('score_duel')" id="btn-mode-score" class="py-3 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase">🍺 Pojedynek</button>
+        <button onclick="setGameMode('tron_race')" id="btn-mode-tron" class="py-3 text-[10px] bg-zinc-800 border border-yellow-500 text-yellow-500 rounded font-chakra uppercase shadow-[0_0_10px_rgba(255,255,0,0.2)]">🎮 TRON Race</button>
+      </div>
+      <div id="map-picker-container" class="space-y-2">
+        <p class="text-[10px] text-gray-500 text-center uppercase">Wybierz metę na mapie:</p>
+        <div id="mini-map"></div>
+        <p id="meta-status" class="text-[9px] text-center text-green-400 font-chakra">Cel: Domyślny</p>
+      </div>
+    </div>
+
+    <button id="ready-launch-btn" onclick="goToGameScreen()" class="w-full py-4 bg-zinc-800 text-gray-500 font-chakra uppercase font-bold text-xs tracking-wider rounded transition-all hidden">
+      Rozpocznij System
+    </button>
+  </main>
+
+
+  <main id="game-screen" class="hidden relative w-full h-screen">
+    
+    <div id="live-map"></div>
+
+    <div class="hud-overlay top-0 left-0 w-full p-3 flex justify-between items-center shadow-lg">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="live-indicator"></span>
+        <span id="ui-mode" class="font-chakra font-bold text-[11px] text-yellow-500 uppercase tracking-widest">🎮 TRON RACE</span>
+      </div>
+      <div id="ui-role-active" class="font-chakra font-bold text-[11px] uppercase tracking-widest">--</div>
+    </div>
+
+    <div class="hud-overlay bottom-0 left-0 w-full p-4 rounded-t-xl">
+      
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        
+        <div class="border-r border-[#333] pr-2">
+          <p class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Twój Wynik (Ty)</p>
+          <p id="my-score-display" class="font-chakra text-2xl font-bold text-white mb-1">0.00</p>
+          <div class="flex justify-between text-[10px] text-gray-400 font-chakra">
+            <span>Dystans:</span> <span id="my-dist-display">0.00 km</span>
+          </div>
+        </div>
+
+        <div class="pl-2">
+          <p class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">Przeciwnik</p>
+          <p id="opp-score-display" class="font-chakra text-2xl font-bold text-gray-600 mb-1">0.00</p>
+          <div class="flex justify-between text-[10px] text-gray-400 font-chakra">
+            <span>Dystans:</span> <span id="opp-dist-display">0.00 km</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="flex justify-between items-center text-[9px] text-gray-500 uppercase tracking-widest mb-3">
+        <span id="system-message">Gotowy do startu</span>
+        <span>GPS: <span id="ui-acc" class="text-white">--</span></span>
+      </div>
+
+      <button id="action-btn" onclick="toggleTracking()" class="w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-widest text-xs uppercase shadow-[0_0_15px_rgba(0,255,0,0.4)]">
+        Uruchom Silnik Gry
+      </button>
+
+    </div>
+
+    <div id="winner-screen" class="hidden absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex-col justify-center items-center p-6 text-center">
+      <h2 class="font-chakra text-4xl font-bold text-white mb-2 uppercase">Koniec Gry</h2>
+      <p id="winner-text" class="font-chakra text-2xl text-[#00ff00] glow-green uppercase mb-6">Wygrywa: --</p>
+      <p id="winner-desc" class="text-xs text-gray-400 font-mono mb-8 leading-relaxed">System zaktualizowany. Odznaka piwna została przyznana.</p>
+      <button onclick="location.reload()" class="font-chakra border border-gray-600 text-gray-300 py-3 px-8 rounded uppercase text-xs tracking-widest">Wróć do Lobby</button>
+    </div>
+
+  </main>
+
+  <script>
+    // --- KONFIGURACJA ---
+    const FIREBASE_DB_URL = "https://biegacz-default-rtdb.europe-west1.firebasedatabase.app/";
+    const MAPBOX_TOKEN = "pk.eyJ1Ijoia296YTIiLCJhIjoiY21wY3c4MHBkMDV5cTJycjI2bnZoc3Y5ciJ9._g6b0kK7J3wD7xxcUnPz2A";
+    
+    // Zmienne Stanu Gry
+    let myId = null;
+    let opponentId = null;
+    let activeMode = "tron_race";
+    let isTracking = false;
+    let watchId = null;
+    let wakeLock = null;
+    let gameStatus = "lobby";
+    
+    // Zmienne Mapy
+    let miniMap = null, liveMap = null;
+    let metaMarkerHUD = null, clickMarker = null;
+    
+    // Zmienne Lokalizacyjne i Wynikowe
+    let myLastCoord = null;
+    let myTotalDist = 0;
+    let myCurrentScore = 0;
+    let opponentScore = 0;
+    let startTime = null;
+    let myCoordsArray = [];
+    let oppCoordsArray = [];
+
+    // Inicjalizacja Firebase
+    firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+    const db = firebase.database();
+
+    // Wzór Haversine (wynik w metrach)
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // ================= LOBBY LOGIC =================
+    function selectPlayer(id) {
+      myId = id;
+      opponentId = id === 'player1' ? 'player2' : 'player1';
+      
+      document.getElementById("btn-p1").className = id === 'player1' ? "py-4 border border-[#00ffff] text-[#00ffff] font-chakra uppercase text-xs rounded bg-cyan-950/20 glow-cyan" : "py-4 border border-zinc-700 text-gray-500 font-chakra uppercase text-xs rounded";
+      document.getElementById("btn-p2").className = id === 'player2' ? "py-4 border border-[#ff00ff] text-[#ff00ff] font-chakra uppercase text-xs rounded bg-magenta-950/20 glow-magenta" : "py-4 border border-zinc-700 text-gray-500 font-chakra uppercase text-xs rounded";
+
+      document.getElementById("ui-role-active").innerText = id === 'player1' ? "G1 (CYAN)" : "G2 (MAGENTA)";
+      document.getElementById("ui-role-active").style.color = id === 'player1' ? "#00ffff" : "#ff00ff";
+      
+      const startBtn = document.getElementById("ready-launch-btn");
+      startBtn.classList.remove("hidden");
+      startBtn.className = "w-full py-4 bg-[#00ff00] text-black font-chakra font-bold uppercase text-xs tracking-wider rounded transition-all shadow-[0_0_15px_rgba(0,255,0,0.3)]";
+
+      if (myId === "player1") {
+        document.getElementById("p1-setup-zone").classList.remove("hidden");
+        if(!miniMap) initMiniMap();
+      } else {
+        document.getElementById("p1-setup-zone").classList.add("hidden");
+      }
+
+      setupFirebaseListeners();
+    }
+
+    function setGameMode(mode) {
+      db.ref("active_game").update({ mode: mode, status: "lobby", winner: null });
+      document.getElementById("btn-mode-score").className = mode === 'score_duel' ? "py-3 text-[10px] bg-zinc-800 border border-[#00ff00] text-[#00ff00] rounded font-chakra uppercase shadow-[0_0_10px_rgba(0,255,0,0.2)]" : "py-3 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase";
+      document.getElementById("btn-mode-tron").className = mode === 'tron_race' ? "py-3 text-[10px] bg-zinc-800 border border-yellow-500 text-yellow-500 rounded font-chakra uppercase shadow-[0_0_10px_rgba(255,255,0,0.2)]" : "py-3 text-[10px] bg-zinc-900 border border-zinc-700 text-white rounded font-chakra uppercase";
+      document.getElementById("map-picker-container").style.display = mode === 'score_duel' ? "none" : "block";
+      if(miniMap) miniMap.resize();
+    }
+
+    function initMiniMap() {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      navigator.geolocation.getCurrentPosition((pos) => {
+        buildMiniMap(pos.coords.longitude, pos.coords.latitude);
+      }, () => { buildMiniMap(21.0122, 52.2297); }, { enableHighAccuracy: true });
+    }
+
+    function buildMiniMap(lng, lat) {
+      miniMap = new mapboxgl.Map({ container: 'mini-map', style: 'mapbox://styles/mapbox/dark-v11', center: [lng, lat], zoom: 13, attributionControl: false });
+      clickMarker = new mapboxgl.Marker({ color: "#FFFF00" }).setLngLat([lng, lat]).addTo(miniMap);
+      miniMap.on('click', (e) => { 
+        clickMarker.setLngLat(e.lngLat); 
+        document.getElementById("meta-status").innerText = `Cel zapisany!`; 
+        db.ref("active_game/checkpoint").set({ lat: e.lngLat.lat, lng: e.lngLat.lng }); 
+      });
+    }
+
+    // ================= DATA SYNC (SĘDZIA W TLE) =================
+    function setupFirebaseListeners() {
+      // 1. Słuchaj ogólnego stanu gry
+      db.ref("active_game").on("value", (snapshot) => {
+        const game = snapshot.val() || {};
+        activeMode = game.mode || "score_duel";
+        gameStatus = game.status || "lobby";
+        
+        document.getElementById("ui-mode").innerText = activeMode === "score_duel" ? "🍺 Score Duel" : "🎮 TRON Race";
+        
+        if (game.checkpoint && metaMarkerHUD) {
+          metaMarkerHUD.setLngLat([game.checkpoint.lng, game.checkpoint.lat]);
+        }
+        
+        if (gameStatus === "finished") {
+          showWinnerScreen(game.winner);
+        }
+      });
+
+      // 2. Słuchaj przeciwnika (do rysowania linii na HUD i pobierania statystyk)
+      db.ref(`live/${opponentId}`).on("value", (snapshot) => {
+        oppCoordsArray = [];
+        let oppLatestScore = 0;
+        let oppTotalDist = 0;
+        let lastOppCoord = null;
+
+        snapshot.forEach((child) => {
+          const val = child.val();
+          if(val.lat && val.lng) {
+            oppCoordsArray.push([val.lng, val.lat]); // dla Mapbox [lng, lat]
+            oppLatestScore = val.score || 0;
+            
+            // Obliczamy wizualny dystans przeciwnika
+            if (lastOppCoord) oppTotalDist += (haversineMeters(lastOppCoord.lat, lastOppCoord.lng, val.lat, val.lng) / 1000);
+            lastOppCoord = {lat: val.lat, lng: val.lng};
+          }
+        });
+
+        opponentScore = oppLatestScore;
+        
+        // Update the Opponent HUD
+        document.getElementById("opp-score-display").innerText = opponentScore.toFixed(2);
+        document.getElementById("opp-score-display").className = "font-chakra text-2xl font-bold mb-1 " + (opponentScore > myCurrentScore ? "text-[#00ff00]" : "text-gray-400");
+        document.getElementById("opp-dist-display").innerText = oppTotalDist.toFixed(2) + " km";
+
+        // Rysuj linię
+        updateHUDLayer(opponentId, oppCoordsArray);
+        evaluateDynamicColors(); // Odśwież kolory na mapie
+      });
+    }
+
+    // ================= MAPA HUD (LIVE) =================
+    function goToGameScreen() {
+      document.getElementById("lobby-screen").classList.add("hidden");
+      document.getElementById("game-screen").classList.remove("hidden");
+      
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      liveMap = new mapboxgl.Map({
+        container: 'live-map', style: 'mapbox://styles/mapbox/dark-v11', center: [21.0122, 52.2297], zoom: 15, attributionControl: false
+      });
+
+      liveMap.on('load', () => {
+        liveMap.addSource("player1", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+        liveMap.addLayer({ id: "line-p1", type: "line", source: "player1", paint: { "line-color": "#00FFFF", "line-width": 6, "line-opacity": 0.8 } });
+
+        liveMap.addSource("player2", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] } } });
+        liveMap.addLayer({ id: "line-p2", type: "line", source: "player2", paint: { "line-color": "#FF00FF", "line-width": 6, "line-opacity": 0.8 } });
+
+        metaMarkerHUD = new mapboxgl.Marker({ color: "#FFFF00" }).setLngLat([21.0122, 52.2297]).addTo(liveMap);
+        
+        db.ref("active_game/checkpoint").once("value", (snap) => {
+          const cp = snap.val();
+          if (cp) metaMarkerHUD.setLngLat([cp.lng, cp.lat]);
+        });
+      });
+    }
+
+    function updateHUDLayer(id, coords) {
+      if (!liveMap || !liveMap.isStyleLoaded()) return;
+      const src = liveMap.getSource(id);
+      if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } });
+    }
+
+    // Zmiana kolorów na mapie w locie (tylko dla Trybu Pojedynku)
+    function evaluateDynamicColors() {
+      if (!liveMap || !liveMap.isStyleLoaded() || activeMode !== "score_duel") return;
+      
+      const p1Color = (myId === 'player1' && myCurrentScore >= opponentScore) || (opponentId === 'player1' && opponentScore >= myCurrentScore) ? "#00FF00" : "#FF0000";
+      const p2Color = (myId === 'player2' && myCurrentScore >= opponentScore) || (opponentId === 'player2' && opponentScore >= myCurrentScore) ? "#00FF00" : "#FF0000";
+      
+      liveMap.setPaintProperty("line-p1", "line-color", p1Color);
+      liveMap.setPaintProperty("line-p2", "line-color", p2Color);
+    }
+
+    // ================= TRACKING & REFEREE ENGINE =================
+    function toggleTracking() {
+      if (isTracking) stopTracking(); else startTracking();
+    }
+
+    function startTracking() {
+      isTracking = true;
+      myTotalDist = 0;
+      myCurrentScore = 0;
+      myLastCoord = null;
+      myCoordsArray = [];
+      startTime = Date.now();
+      
+      document.getElementById("action-btn").innerText = "ZATRZYMAJ SILNIK GRY";
+      document.getElementById("action-btn").className = "w-full font-chakra font-bold py-4 rounded text-white bg-red-600 hover:bg-red-700 transition-all tracking-widest text-xs uppercase shadow-[0_0_15px_rgba(255,0,0,0.4)]";
+      document.getElementById("system-message").innerText = "TRANSMISJA W TOKU";
+      document.getElementById("live-indicator").className = "w-2 h-2 rounded-full bg-[#00ff00] shadow-[0_0_8px_#00ff00]";
+
+      if (myId === "player1") {
+        db.ref("live").remove(); 
+        db.ref("active_game").update({ status: "live", winner: null });
+      }
+
+      if ('wakeLock' in navigator) {
+        navigator.wakeLock.request('screen').then(lock => wakeLock = lock).catch(()=>{});
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if(gameStatus === "finished") return;
+
+          const { latitude, longitude, accuracy } = pos.coords;
+          document.getElementById("ui-acc").innerText = Math.round(accuracy) + " m";
+          if (accuracy > 40) return;
+
+          // Autocentrowanie mapy na mnie
+          if (liveMap) liveMap.flyTo({ center: [longitude, latitude], zoom: 16, speed: 0.5 });
+
+          const now = Date.now();
+          if (myLastCoord) {
+            myTotalDist += haversineMeters(myLastCoord.lat, myLastCoord.lng, latitude, longitude) / 1000;
+          }
+          myLastCoord = { lat: latitude, lng: longitude };
+
+          const elapsedMinutes = (now - startTime) / 1000 / 60;
+          const avgSpeedKmh = elapsedMinutes > 0 ? (myTotalDist / (elapsedMinutes / 60)) : 0;
+
+          // Obliczanie wyniku
+          if (activeMode === "score_duel") {
+            myCurrentScore = (myTotalDist * 50) + (avgSpeedKmh * 20) + (elapsedMinutes * 2);
+          } else {
+            myCurrentScore = myTotalDist; // W TRON Score to po prostu odległość dla wglądu
+          }
+
+          // Aktualizacja mojego interfejsu (HUD)
+          document.getElementById("my-score-display").innerText = myCurrentScore.toFixed(2);
+          document.getElementById("my-dist-display").innerText = myTotalDist.toFixed(2) + " km";
+          document.getElementById("my-score-display").className = "font-chakra text-2xl font-bold mb-1 " + (myCurrentScore >= opponentScore ? "text-[#00ff00]" : "text-red-500");
+
+          // Rysowanie mojej linii
+          myCoordsArray.push([longitude, latitude]);
+          updateHUDLayer(myId, myCoordsArray);
+          evaluateDynamicColors();
+
+          // Push do bazy
+          db.ref(`live/${myId}`).push({ lat: latitude, lng: longitude, ts: now, score: myCurrentScore });
+
+          // SĘDZIOWANIE KOLIZJI I METY W TLE (Dla TRON)
+          if (activeMode === "tron_race") {
+            // 1. Check meta
+            db.ref("active_game/checkpoint").once("value", (snap) => {
+              const cp = snap.val();
+              if (cp && haversineMeters(latitude, longitude, cp.lat, cp.lng) < 15) {
+                db.ref("active_game").update({ status: "finished", winner: myId });
+              }
+            });
+            // 2. Check collision (czy wpadłem na linię wroga)
+            for (let i = 0; i < oppCoordsArray.length; i++) {
+              if (haversineMeters(latitude, longitude, oppCoordsArray[i][1], oppCoordsArray[i][0]) < 7) {
+                db.ref("active_game").update({ status: "finished", winner: opponentId });
+                break;
+              }
+            }
+          }
+        },
+        (err) => { document.getElementById("system-message").innerText = "BŁĄD GPS"; },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function stopTracking() {
+      isTracking = false;
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (wakeLock) wakeLock.release().then(() => wakeLock = null);
+      
+      document.getElementById("action-btn").innerText = "Uruchom Silnik Gry";
+      document.getElementById("action-btn").className = "w-full font-chakra font-bold py-4 rounded text-black bg-[#00ff00] hover:bg-[#33ff33] transition-all tracking-widest text-xs uppercase shadow-[0_0_15px_rgba(0,255,0,0.4)]";
+      document.getElementById("live-indicator").className = "w-2 h-2 rounded-full bg-red-500";
+      document.getElementById("system-message").innerText = "Silnik zatrzymany";
+    }
+
+    // ================= WINNER SCREEN =================
+    function showWinnerScreen(winnerId) {
+      stopTracking();
+      const screen = document.getElementById("winner-screen");
+      const text = document.getElementById("winner-text");
+      const desc = document.getElementById("winner-desc");
+      
+      screen.classList.remove("hidden");
+      screen.classList.add("flex");
+
+      if (winnerId === myId) {
+        text.innerText = "ZWYCIĘSTWO!";
+        text.className = "font-chakra text-3xl text-[#00ff00] glow-green uppercase mb-4";
+        desc.innerText = "System przyznał Ci odznakę. Twój przeciwnik wisi Ci darmowe piwo!";
+      } else {
+        text.innerText = "PORAŻKA!";
+        text.className = "font-chakra text-3xl text-[#ff0000] glow-red uppercase mb-4";
+        desc.innerText = "System wykrył krytyczny błąd taktyczny. Przegrałeś ten wyścig.";
+      }
+    }
+  </script>
+</body>
+</html>
